@@ -35,12 +35,12 @@ def hrm_clean_up1(df: pd.DataFrame) -> pd.DataFrame:
 
     # Parse date columns only
     for col in df.columns:
-    if "date" in col.lower():
-        df[col] = pd.to_datetime(
-            df[col],
-            format="%d_%m_%Y",
-            errors="coerce"
-        )
+        if "date" in col.lower():
+            df[col] = pd.to_datetime(
+                df[col],
+                format="%d_%m_%Y",
+                errors="coerce",
+            )
 
     # Convert only mostly numeric columns
     for col in df.columns:
