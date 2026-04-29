@@ -13,29 +13,40 @@ def hrm_clean_up1(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean and collapse a merged HRM export.
 
-    Removes duplicate rows, coerces numeric columns, and returns
-    one row per HRM study.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Merged HRM dataframe (main + swallows).
-
-    Returns
-    -------
-    pd.DataFrame
-        Cleaned dataframe with one row per study.
+    Removes duplicate rows, coerces selected numeric columns,
+    parses dates, and returns one row per HRM study.
     """
     df = df.copy()
 
-    # Drop raw per-swallow numeric trace columns (e.g. Num1, Num23)
+    # Drop raw per-swallow numeric trace columns, e.g. Num1, Num23
     trace_cols = [c for c in df.columns if re.match(r"Num\d+", c)]
     df = df.drop(columns=trace_cols, errors="ignore")
 
-    # Coerce numeric columns
-    skip_patterns = ["id", "Id", "ID", "date", "Date", "name", "Name", "diagnosis"]
-    for col in df.columns:
-        if not any(p in col for p in skip_patterns):
+    # Explicitly define numeric HRM columns
+    numeric_cols = [
+        "BasalrespiratoryminmmHg",
+        "ResidualmeanmmHg",
+        "BasalrespiratorymeanmmHg",
+        "DistalcontractileintegralmeanmmHgcms",
+        "Contractilefrontvelocitycms",
+        "IntraboluspressureATLESRmmHg",
+        "Distallatency",
+        "failedChicagoClassification",
+        "panesophagealpressurization",
+        "largebreaks",
+        "prematurecontraction",
+        "rapidcontraction",
+        "smallbreaks",
+        "LESlengthcm",
+        "PIPfromnarescm",
+        "DistalLESfromnarescm",
+        "Hiatalhernia",
+        "Age",
+        "Height",
+    ]
+
+    for col in numeric_cols:
+        if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     # Parse date columns
@@ -44,18 +55,27 @@ def hrm_clean_up1(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
     # Deduplicate to one row per study ID
-    id_cols = [c for c in df.columns if "HRM_Id" in c or c == "HRM_Id"]
+    id_cols = [c for c in df.columns if c == "HRM_Id"]
+
     if id_cols:
-        # Aggregate: for numeric cols take mean, for other cols take first
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
+        id_col = id_cols[0]
 
-        agg_dict = {c: "mean" for c in numeric_cols if c != id_cols[0]}
-        agg_dict.update(
-            {c: "first" for c in non_numeric_cols if c != id_cols[0]}
-        )
+        numeric_cols_present = df.select_dtypes(include=[np.number]).columns.tolist()
+        non_numeric_cols = [c for c in df.columns if c not in numeric_cols_present]
 
-        df = df.groupby(id_cols[0], as_index=False).agg(agg_dict)
+        agg_dict = {
+            c: "mean"
+            for c in numeric_cols_present
+            if c != id_col
+        }
+
+        agg_dict.update({
+            c: "first"
+            for c in non_numeric_cols
+            if c != id_col
+        })
+
+        df = df.groupby(id_col, as_index=False).agg(agg_dict)
 
     return df.reset_index(drop=True)
 
