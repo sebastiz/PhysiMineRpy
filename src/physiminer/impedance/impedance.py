@@ -170,40 +170,26 @@ def gord_acid_imp_lyon(
 ) -> pd.DataFrame:
     """
     Lyon Consensus 2.0 classification for pH-impedance data.
-
-    Borderline AET (4–6%) cases are upgraded to conclusive GORD when
-    at least one adjunctive metric (MNBI, PSPW, total reflux episodes)
-    exceeds its threshold.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Impedance dataframe.
-    aet_col : str
-        Column name for 24-h AET percentage.
-    pathological_aet : float
-        AET threshold for conclusive GORD (default 6%).
-    normal_aet : float
-        AET threshold below which GORD is excluded (default 4%).
-    mnbi_col : str, optional
-        Column for mean nocturnal baseline impedance (Ω).
-    mnbi_threshold : float
-        MNBI below this supports GORD (default 2292 Ω).
-    pspw_col : str, optional
-        Column for PSPW index (%).
-    pspw_threshold : float
-        PSPW below this supports GORD (default 61%).
-    total_reflux_col : str, optional
-        Column for total reflux episodes count.
-    total_reflux_threshold : float
-        Total reflux above this supports GORD (default 80).
-
-    Returns
-    -------
-    pd.DataFrame
-        Dataframe with AcidReflux_Lyon and AcidReflux_Imp columns added.
     """
     df = df.copy()
+
+    # Parse VisitDate if present
+    if "VisitDate" in df.columns:
+        s = (
+            df["VisitDate"]
+            .astype("string")
+            .str.strip()
+            .str.replace("_", "/", regex=False)
+            .str.replace("-", "/", regex=False)
+        )
+
+        df["VisitDate"] = pd.to_datetime(
+            s,
+            format="%d/%m/%Y",
+            errors="coerce"
+        )
+
+    # continue with the rest of the function...
 
     def classify_row(row):
         aet = pd.to_numeric(row.get(aet_col, np.nan), errors="coerce")
