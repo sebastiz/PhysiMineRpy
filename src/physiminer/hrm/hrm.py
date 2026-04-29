@@ -10,70 +10,76 @@ from typing import Optional
 
 
 def hrm_clean_up1(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Clean and collapse a merged HRM export.
-
-    Removes duplicate rows, coerces selected numeric columns,
-    parses dates, and returns one row per HRM study.
-    """
     df = df.copy()
 
-    # Drop raw per-swallow numeric trace columns, e.g. Num1, Num23
-    trace_cols = [c for c in df.columns if re.match(r"Num\d+", c)]
+    # Normalise column names
+    df.columns = df.columns.astype(str).str.strip()
+
+    # Drop raw per-swallow numeric trace columns
+    trace_cols = [c for c in df.columns if re.match(r"Num\d+", str(c))]
     df = df.drop(columns=trace_cols, errors="ignore")
 
-    # Explicitly define numeric HRM columns
-    numeric_cols = [
-        "BasalrespiratoryminmmHg",
-        "ResidualmeanmmHg",
-        "BasalrespiratorymeanmmHg",
-        "DistalcontractileintegralmeanmmHgcms",
-        "Contractilefrontvelocitycms",
-        "IntraboluspressureATLESRmmHg",
-        "Distallatency",
-        "failedChicagoClassification",
-        "panesophagealpressurization",
-        "largebreaks",
-        "prematurecontraction",
-        "rapidcontraction",
-        "smallbreaks",
-        "LESlengthcm",
-        "PIPfromnarescm",
-        "DistalLESfromnarescm",
-        "Hiatalhernia",
-        "Age",
-        "Height",
-    ]
+    # Columns that should never be converted to numeric
+    protected_text_cols = {
+        "chicagoclassification",
+        "procedure",
+        "physician",
+        "referringphysician",
+        "gender",
+        "operator",
+        "hospnum_id",
+        "hrm_id",
+        "dobage",
+        "height",
+    }
 
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    # Parse date columns
+    # Parse date columns only
     for col in df.columns:
         if "date" in col.lower():
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+            df[col] = pd.to_datetime(
+                df[col],
+                errors="coerce",
+                dayfirst=True
+            )
 
-    # Deduplicate to one row per study ID
-    id_cols = [c for c in df.columns if c == "HRM_Id"]
+    # Convert only mostly numeric columns
+    for col in df.columns:
+        col_key = col.lower().strip()
 
-    if id_cols:
-        id_col = id_cols[0]
+        if col_key in protected_text_cols:
+            continue
 
-        numeric_cols_present = df.select_dtypes(include=[np.number]).columns.tolist()
-        non_numeric_cols = [c for c in df.columns if c not in numeric_cols_present]
+        if "date" in col_key:
+            continue
 
-        agg_dict = {
-            c: "mean"
-            for c in numeric_cols_present
-            if c != id_col
-        }
+        if df[col].dtype == "object" or str(df[col].dtype) == "string":
+            non_missing = df[col].dropna()
 
-        agg_dict.update({
-            c: "first"
-            for c in non_numeric_cols
-            if c != id_col
-        })
+            if len(non_missing) == 0:
+                continue
+
+            converted = pd.to_numeric(non_missing, errors="coerce")
+            proportion_numeric = converted.notna().mean()
+
+            if proportion_numeric >= 0.8:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Deduplicate to one row per HRM study ID
+    if "HRM_Id" in df.columns:
+        id_col = "HRM_Id"
+
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+
+        agg_dict = {}
+
+        for col in df.columns:
+            if col == id_col:
+                continue
+
+            if col in numeric_cols:
+                agg_dict[col] = "mean"
+            else:
+                agg_dict[col] = "first"
 
         df = df.groupby(id_col, as_index=False).agg(agg_dict)
 
