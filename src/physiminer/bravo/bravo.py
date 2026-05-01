@@ -56,45 +56,22 @@ def data_bravo_day_labeller(
     id_col: str = "HospNum_Id",
     date_col: str = "VisitDate",
 ) -> pd.DataFrame:
-    """
-    Standardise per-day AET column names to bravoDay1 … bravoDay6.
-
-    Sierra exports use inconsistent naming (ReflDay1, ReflDay1_2, etc.).
-    This function maps those to standardised columns and computes bravoNDays.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Cleaned BRAVO dataframe.
-    id_col : str
-        Patient/study identifier column.
-    date_col : str
-        Visit date column.
-
-    Returns
-    -------
-    pd.DataFrame
-        Dataframe with bravoDay1–bravoDay6 and bravoNDays added.
-    """
     df = df.copy()
-
-    # Patterns Sierra uses for per-day AET columns
+    
     day_patterns = [
-        # (day_number, list of possible column name patterns)
-        (1, ["ReflDay1", "Day1AET", "day1", "Day1"]),
-        (2, ["ReflDay2", "Day2AET", "day2", "Day2"]),
-        (3, ["ReflDay3", "Day3AET", "day3", "Day3"]),
-        (4, ["ReflDay4", "Day4AET", "day4", "Day4"]),
-        (5, ["ReflDay5", "Day5AET", "day5", "Day5"]),
-        (6, ["ReflDay6", "Day6AET", "day6", "Day6"]),
+        (1, ["ReflDay1", "Day1AET", "day1", "Day1", "ReflDay1FractionTimepHLessThan4Total"]),
+        (2, ["ReflDay2", "Day2AET", "day2", "Day2", "ReflDay2FractionTimepHLessThan4Total"]),
+        (3, ["ReflDay3", "Day3AET", "day3", "Day3", "ReflDay3FractionTimepHLessThan4Total"]),
+        (4, ["ReflDay4", "Day4AET", "day4", "Day4", "ReflDay4FractionTimepHLessThan4Total"]),
+        (5, ["ReflDay5", "Day5AET", "day5", "Day5", "ReflDay5FractionTimepHLessThan4Total"]),
+        (6, ["ReflDay6", "Day6AET", "day6", "Day6", "ReflDay6FractionTimepHLessThan4Total"]),
     ]
-
+    
     for day_num, patterns in day_patterns:
         target_col = f"bravoDay{day_num}"
         if target_col not in df.columns:
             matched = None
             for pat in patterns:
-                # Case-insensitive pattern search
                 candidates = [c for c in df.columns if pat.lower() in c.lower()]
                 if candidates:
                     matched = candidates[0]
@@ -104,10 +81,8 @@ def data_bravo_day_labeller(
             else:
                 df[target_col] = np.nan
 
-    # Count days with a recorded AET value
     day_cols = [f"bravoDay{i}" for i in range(1, 7)]
     df["bravoNDays"] = df[day_cols].notna().sum(axis=1)
-
     return df
 
 
