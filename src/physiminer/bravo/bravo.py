@@ -193,18 +193,18 @@ def gord_acid_bravo_lyon(
 
     def classify_row(row):
         days = pd.to_numeric(
-            pd.Series([row.get(c, np.nan) for c in available_day_cols]),
+            pd.Series([row[c] for c in available_day_cols if c in row.index]),
             errors="coerce"
         ).dropna()
 
         if len(days) == 0:
             return "Inconclusive", 0, 0, 0
 
-        n_positive = (days > pathological_aet).sum()
-        all_normal = (days < normal_aet).all()
-        average_aet = days.mean()
+        n_positive    = (days > pathological_aet).sum()
+        all_normal    = (days < normal_aet).all()
+        average_aet   = days.mean()
 
-        # Per-day conclusive GORD
+        # Lyon 2.0 three-tier
         if n_positive >= min_positive_days:
             lyon_class = "Conclusive GORD"
             acid_reflux = 1
@@ -215,26 +215,22 @@ def gord_acid_bravo_lyon(
             lyon_class = "Inconclusive"
             acid_reflux = 0
 
-        # Average-day analysis
+        # Average AET classification
         acid_reflux_av = 1 if average_aet > pathological_aet else 0
 
-        # Total-only (single-day worst approach, but using average below normal)
-        acid_reflux_total_only = 1 if all_normal else 0
-        if acid_reflux_total_only == 1:
-            acid_reflux_total_only = 0  # inverted: 1 means normal by total
-        else:
-            acid_reflux_total_only = 0
-
-        # Simpler: TotalOnly flags patients where average < normal
-        acid_reflux_total_only = 1 if (average_aet < normal_aet) else 0
+        # Total-only: flags patients where average AET is below normal threshold
+        acid_reflux_total_only = 1 if average_aet < normal_aet else 0
 
         return lyon_class, acid_reflux, acid_reflux_total_only, acid_reflux_av
 
-    results = df.apply(classify_row, axis=1)
-    df["AcidRefluxBRAVO_Lyon"] = results.apply(lambda x: x[0])
-    df["AcidRefluxBRAVO"] = results.apply(lambda x: x[1])
-    df["AcidRefluxBRAVOTotalOnly"] = results.apply(lambda x: x[2])
-    df["AcidRefluxBRAVOAv"] = results.apply(lambda x: x[3])
+    results = df.apply(classify_row, axis=1, result_type="expand")
+    results.columns = [
+        "AcidRefluxBRAVO_Lyon",
+        "AcidRefluxBRAVO",
+        "AcidRefluxBRAVOTotalOnly",
+        "AcidRefluxBRAVOAv",
+    ]
+    df = pd.concat([df, results], axis=1)
 
     return df
 
