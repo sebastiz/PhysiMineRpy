@@ -48,10 +48,12 @@ def data_imp_clean(df: pd.DataFrame) -> pd.DataFrame:
         if any(pat.lower() in col.lower() for pat in numeric_patterns):
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Multiply AET percent columns by 100 if in proportion form (0-1)
+    # Multiply percent columns by 100 if in proportion form (0-1)
+    # Safe threshold of 10: real AET data always has some patients above 10%
     aet_cols = [c for c in df.columns if "PercentTime" in c or "Percent" in c]
     for col in aet_cols:
-        if df[col].dropna().max() <= 1.0:
+        col_data = df[col].dropna()
+        if len(col_data) > 0 and col_data.max() < 10.0 and col_data.min() >= 0.0:
             df[col] = df[col] * 100
 
     # Create binary Sx_* indicators from SAP columns
