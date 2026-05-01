@@ -59,12 +59,12 @@ def data_bravo_day_labeller(
     df = df.copy()
     
     day_patterns = [
-        (1, ["ReflDay1", "Day1AET", "day1", "Day1", "ReflDay1FractionTimepHLessThan4Total"]),
-        (2, ["ReflDay2", "Day2AET", "day2", "Day2", "ReflDay2FractionTimepHLessThan4Total"]),
-        (3, ["ReflDay3", "Day3AET", "day3", "Day3", "ReflDay3FractionTimepHLessThan4Total"]),
-        (4, ["ReflDay4", "Day4AET", "day4", "Day4", "ReflDay4FractionTimepHLessThan4Total"]),
-        (5, ["ReflDay5", "Day5AET", "day5", "Day5", "ReflDay5FractionTimepHLessThan4Total"]),
-        (6, ["ReflDay6", "Day6AET", "day6", "Day6", "ReflDay6FractionTimepHLessThan4Total"]),
+        (1, ["ReflDay1FractionTimepHLessThan4Total", "ReflDay1", "Day1AET", "day1", "Day1"]),
+        (2, ["ReflDay2FractionTimepHLessThan4Total", "ReflDay2", "Day2AET", "day2", "Day2"]),
+        (3, ["ReflDay3FractionTimepHLessThan4Day3",  "ReflDay3FractionTimepHLessThan4Total", "ReflDay3", "Day3AET", "day3", "Day3"]),
+        (4, ["ReflDay4FractionTimepHLessThan4Day4",  "ReflDay4FractionTimepHLessThan4Total", "ReflDay4", "Day4AET", "day4", "Day4"]),
+        (5, ["ReflDay5FractionTimepHLessThan4Day5",  "ReflDay5FractionTimepHLessThan4Total", "ReflDay5", "Day5AET", "day5", "Day5"]),
+        (6, ["ReflDay6FractionTimepHLessThan4Day6",  "ReflDay6FractionTimepHLessThan4Total", "ReflDay6", "Day6AET", "day6", "Day6"]),
     ]
     
     for day_num, patterns in day_patterns:
@@ -72,6 +72,11 @@ def data_bravo_day_labeller(
         if target_col not in df.columns:
             matched = None
             for pat in patterns:
+                # Exact match first
+                if pat in df.columns:
+                    matched = pat
+                    break
+                # Then case-insensitive substring match
                 candidates = [c for c in df.columns if pat.lower() in c.lower()]
                 if candidates:
                     matched = candidates[0]
