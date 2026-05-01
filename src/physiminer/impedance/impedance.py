@@ -176,15 +176,25 @@ def gord_acid_imp_lyon(
     aet_col: str = "MainAcidExpTotalClearanceChannelPercentTime",
     pathological_aet: float = 6.0,
     normal_aet: float = 4.0,
-    mnbi_col: Optional[str] = None,
-    mnbi_threshold: float = 2292.0,
-    pspw_col: Optional[str] = None,
-    pspw_threshold: float = 61.0,
-    total_reflux_col: Optional[str] = None,
-    total_reflux_threshold: float = 80.0,
 ) -> pd.DataFrame:
     """
-    Lyon Consensus 2.0 classification for pH-impedance data.
+    Lyon Consensus 2.0 classification for pH-impedance data based on AET only.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Cleaned impedance dataframe.
+    aet_col : str
+        Column name for total acid exposure time percentage.
+    pathological_aet : float
+        AET threshold for conclusive GORD (default 6%).
+    normal_aet : float
+        AET threshold below which GORD is excluded (default 4%).
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe with LyonConsensus and AcidReflux_Imp added.
     """
     df = df.copy()
 
@@ -197,12 +207,28 @@ def gord_acid_imp_lyon(
             .str.replace("_", "/", regex=False)
             .str.replace("-", "/", regex=False)
         )
+        df["VisitDate"] = pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
 
-        df["VisitDate"] = pd.to_datetime(
-            s,
-            format="%d/%m/%Y",
+    def classify_row(row):
+        aet = pd.to_numeric(
+            row[aet_col] if aet_col in row.index else np.nan,
             errors="coerce"
         )
+
+        if pd.isna(aet):
+            return "Inconclusive", 0
+        elif aet > pathological_aet:
+            return "Abnormal", 1
+        elif aet < normal_aet:
+            return "Normal", 0
+        else:
+            return "Inconclusive", 0
+
+    results = df.apply(classify_row, axis=1, result_type="expand")
+    results.columns = ["LyonConsensus", "AcidReflux_Imp"]
+    df = pd.concat([df, results], axis=1)
+
+    return df
 
     # continue with the rest of the function...
 
