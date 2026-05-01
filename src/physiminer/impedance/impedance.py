@@ -27,12 +27,19 @@ def data_imp_clean(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    # Parse date columns
+    # Parse date columns - handles 19_10_2020, 19-10-2020, 19/10/2020 formats
     for col in df.columns:
-        if "date" in col.lower() or "Date" in col:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+        if "date" in col.lower():
+            s = (
+                df[col]
+                .astype("string")
+                .str.strip()
+                .str.replace("_", "/", regex=False)
+                .str.replace("-", "/", regex=False)
+            )
+            df[col] = pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
 
-    # Coerce reflux metric columns
+    # Coerce reflux metric columns to numeric
     numeric_patterns = [
         "AET", "Acid", "Refl", "SAP", "SI", "Episode", "MNBI",
         "pH", "impedance", "Imp", "Total", "Percent",
@@ -40,6 +47,12 @@ def data_imp_clean(df: pd.DataFrame) -> pd.DataFrame:
     for col in df.columns:
         if any(pat.lower() in col.lower() for pat in numeric_patterns):
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Multiply AET percent columns by 100 if in proportion form (0-1)
+    aet_cols = [c for c in df.columns if "PercentTime" in c or "Percent" in c]
+    for col in aet_cols:
+        if df[col].dropna().max() <= 1.0:
+            df[col] = df[col] * 100
 
     # Create binary Sx_* indicators from SAP columns
     sap_cols = [c for c in df.columns if c.upper().startswith("SAP")]
