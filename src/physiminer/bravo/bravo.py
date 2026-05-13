@@ -159,6 +159,89 @@ def data_bravo_symptoms(df: pd.DataFrame, symp_col: str = "Symptoms") -> pd.Data
 
     return df
 
+def gord_acid_bravo_lyon_fixed(
+    df: pd.DataFrame,
+    pathological_aet: float = 6.0,
+    normal_aet: float = 4.0,
+    min_positive_days: int = 2,
+    min_days_for_exclusion: int = 2,
+) -> pd.DataFrame:
+    """
+    Apply Lyon-style BRAVO classification.
+
+    Conclusive GORD:
+        >= min_positive_days with AET > pathological_aet
+
+    GORD excluded:
+        at least min_days_for_exclusion valid days
+        AND all valid days have AET < normal_aet
+
+    Otherwise:
+        Inconclusive
+    """
+
+    df = df.copy()
+
+    day_cols = [f"bravoDay{i}" for i in range(1, 7)]
+    available_day_cols = [c for c in day_cols if c in df.columns]
+
+    def classify_row(row):
+        raw_days = pd.Series(
+            [row[c] for c in available_day_cols if c in row.index],
+            index=[c for c in available_day_cols if c in row.index]
+        )
+
+        days = pd.to_numeric(raw_days, errors="coerce").dropna()
+
+        n_valid = len(days)
+
+        if n_valid == 0:
+            return "Inconclusive", 0, 0, 0, n_valid, None
+
+        n_positive = (days > pathological_aet).sum()
+        all_normal = (days < normal_aet).all()
+        average_aet = days.mean()
+
+        if n_positive >= min_positive_days:
+            lyon_class = "Conclusive GORD"
+            acid_reflux = 1
+
+        elif n_valid >= min_days_for_exclusion and all_normal:
+            lyon_class = "GORD excluded"
+            acid_reflux = 0
+
+        else:
+            lyon_class = "Inconclusive"
+            acid_reflux = 0
+
+        acid_reflux_av = 1 if average_aet > pathological_aet else 0
+
+        acid_reflux_total_only = 1 if average_aet < normal_aet else 0
+
+        return (
+            lyon_class,
+            acid_reflux,
+            acid_reflux_total_only,
+            acid_reflux_av,
+            n_valid,
+            average_aet,
+        )
+
+    results = df.apply(classify_row, axis=1, result_type="expand")
+
+    results.columns = [
+        "AcidRefluxBRAVO_Lyon",
+        "AcidRefluxBRAVO",
+        "AcidRefluxBRAVOTotalOnly",
+        "AcidRefluxBRAVOAv",
+        "bravoNValidDays",
+        "bravoAverageAET",
+    ]
+
+    df = pd.concat([df, results], axis=1)
+
+    return df
+    
 
 def gord_acid_bravo_lyon(
     df: pd.DataFrame,
